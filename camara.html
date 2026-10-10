@@ -2,32 +2,33 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>ReporterCam Pro - (c)cfaesoft</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    /* Forzar vista horizontal real e inmersiva al grabar */
+    /* Estilos para forzar orientación horizontal panorámica */
     .recording-fullscreen {
       position: fixed !important;
       inset: 0 !important;
       z-index: 9999 !important;
       width: 100vw !important;
       height: 100vh !important;
-      max-width: none !important;
-      max-height: none !important;
       border-radius: 0 !important;
       border: none !important;
       margin: 0 !important;
       padding: 0 !important;
       background-color: #000 !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
     }
-    .recording-fullscreen video {
-      width: 100% !important;
-      height: 100% !important;
-      object-fit: cover !important;
+
+    /* Si el dispositivo sigue en vertical al grabar, rotamos la vista 90 grados por CSS */
+    @media (orientation: portrait) {
+      .recording-fullscreen {
+        width: 100vh !important;
+        height: 100vw !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) rotate(90deg) !important;
+      }
     }
   </style>
 </head>
@@ -43,9 +44,9 @@
         </h1>
         <p class="text-[9px] text-slate-400 tracking-widest uppercase font-mono mt-0.5">(c)cfaesoft - Cámara Periodística de Campo</p>
       </div>
-      <div class="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-emerald-500/30 font-mono">
-        HD AUDIO+
-      </div>
+      <a href="index.html" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 transition">
+        🏠 Menú
+      </a>
     </header>
 
     <!-- Datos del Reportaje / Cintillo Televisivo -->
@@ -72,15 +73,12 @@
       <video id="camera-preview" autoplay playsinline muted class="w-full h-full object-cover"></video>
       
       <!-- Cuenta Regresiva (Overlay 3, 2, 1) -->
-      <div id="countdown-overlay" class="hidden absolute inset-0 bg-black/85 flex items-center justify-center z-30">
-        <div class="text-center space-y-2">
-          <p class="text-[11px] text-cyan-400 font-mono uppercase tracking-widest">¡Gira tu celular en horizontal!</p>
-          <span id="countdown-number" class="text-7xl font-black text-white animate-bounce font-mono">3</span>
-        </div>
+      <div id="countdown-overlay" class="hidden absolute inset-0 bg-black/80 flex items-center justify-center z-30">
+        <span id="countdown-number" class="text-6xl font-black text-cyan-400 animate-bounce font-mono">3</span>
       </div>
 
       <!-- Temporizador Flotante de Grabación Real -->
-      <div id="recording-timer" class="hidden absolute top-4 left-4 bg-rose-600/95 text-white font-mono font-bold text-sm px-3.5 py-1.5 rounded-xl animate-pulse flex items-center space-x-2 shadow-2xl z-20">
+      <div id="recording-timer" class="hidden absolute top-4 left-4 bg-rose-600/90 text-white font-mono font-bold text-sm px-3 py-1.5 rounded-xl animate-pulse flex items-center space-x-2 shadow-2xl z-20">
         <span>🔴 REC</span> <span id="timer-text">00:00</span>
       </div>
 
@@ -124,7 +122,7 @@
     </div>
 
     <footer class="text-center pt-1 border-t border-slate-800/80">
-      <p class="text-[9px] text-slate-500 font-mono">(c)cfaesoft - ReporterCam Pro</p>
+      <p class="text-[9px] text-slate-500 font-mono">ReporterCam Pro - Captura e Integración de Prensa</p>
     </footer>
   </div>
 
@@ -158,14 +156,24 @@
       }
 
       try {
+        // Forzar proporciones 16:9 horizontales nativas en la cámara del celular
         rawStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+          video: { 
+            facingMode: currentFacingMode, 
+            width: { ideal: 1280 }, 
+            height: { ideal: 720 },
+            aspectRatio: { ideal: 1.777777778 }
+          },
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
         });
 
         videoPreview.srcObject = rawStream;
       } catch (err) {
-        alert("No se pudo acceder a la cámara o micrófono. Otorga los permisos necesarios.");
+        alert("No se pudo acceder a la cámara o micrófono. Otorga los permisos en el navegador.");
         console.error(err);
       }
     }
@@ -214,7 +222,7 @@
           await screen.orientation.lock('landscape').catch(() => {});
         }
       } catch (err) {
-        console.log("Pantalla completa activa.");
+        console.log("Modo pantalla completa procesado.");
       }
       cameraContainer.classList.add('recording-fullscreen');
     }
@@ -224,7 +232,8 @@
 
       document.getElementById('btn-stop-floating').classList.remove('hidden');
 
-      // Procesamiento de audio con Web Audio API para elevar el volumen y limpiar eco/ruido
+      // Preamplificación limpia de audio al 250%
+      let recordingStream = rawStream;
       try {
         if (!audioContext) {
           audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -233,30 +242,33 @@
           audioContext.resume();
         }
 
-        const source = audioContext.createMediaStreamSource(rawStream);
+        const audioSource = audioContext.createMediaStreamSource(rawStream);
         gainNode = audioContext.createGain();
-        gainNode.gain.value = 3.0; // Ganancia de audio amplificada al 300% para excelente nitidez
+        gainNode.gain.value = 2.5; 
 
-        const destination = audioContext.createMediaStreamDestination();
-        source.connect(gainNode);
-        gainNode.connect(destination);
+        const destinationNode = audioContext.createMediaStreamDestination();
+        audioSource.connect(gainNode);
+        gainNode.connect(destinationNode);
 
-        const enhancedAudioTrack = destination.stream.getAudioTracks()[0];
-        const videoTrack = rawStream.getVideoTracks()[0];
-
-        const combinedStream = new MediaStream([videoTrack, enhancedAudioTrack]);
-
-        recordedChunks = [];
-        let options = { mimeType: 'video/webm;codecs=vp8,opus' };
-
-        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-          options = { mimeType: 'video/mp4' };
-        }
-
-        mediaRecorder = new MediaRecorder(combinedStream, options);
+        recordingStream = new MediaStream([
+          ...rawStream.getVideoTracks(),
+          ...destinationNode.stream.getAudioTracks()
+        ]);
       } catch (e) {
-        // Fallback directo si el navegador bloquea el AudioContext
-        mediaRecorder = new MediaRecorder(rawStream);
+        recordingStream = rawStream;
+      }
+
+      recordedChunks = [];
+      let options = { mimeType: 'video/webm;codecs=vp8,opus' };
+
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        options = { mimeType: 'video/mp4' };
+      }
+
+      try {
+        mediaRecorder = new MediaRecorder(recordingStream, options);
+      } catch (e) {
+        mediaRecorder = new MediaRecorder(recordingStream);
       }
 
       mediaRecorder.ondataavailable = function(e) {
@@ -314,7 +326,7 @@
     }
 
     function saveVideo() {
-      const blob = new Blob(recordedChunks, { type: 'video/webm' });
+      const blob = new Blob(recordedChunks, { type: 'video/mp4' });
       const title = document.getElementById('input-title').value.trim() || 'Reporte';
       
       const newVideo = {
@@ -349,7 +361,7 @@
               <p class="font-bold text-slate-100 truncate">${v.name}</p>
             </div>
             <div class="flex items-center space-x-1.5 shrink-0">
-              <a href="${v.url}" download="${v.name}.webm" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-xs shadow flex items-center space-x-1" title="Guardar Video">
+              <a href="${v.url}" download="${v.name}.mp4" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-xs shadow flex items-center space-x-1" title="Guardar Video">
                 <span>💾</span> <span class="hidden sm:inline">Guardar</span>
               </a>
               <button onclick="shareWhatsApp(${index})" class="px-2.5 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold text-xs shadow flex items-center space-x-1" title="Enviar por WhatsApp">
@@ -370,7 +382,7 @@
       const v = videos[index];
       if (!v) return;
 
-      const file = new File([v.blob], `${v.name}.webm`, { type: 'video/webm' });
+      const file = new File([v.blob], `${v.name}.mp4`, { type: 'video/mp4' });
 
       if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         navigator.share({
@@ -381,7 +393,7 @@
       } else {
         const a = document.createElement('a');
         a.href = v.url;
-        a.download = `${v.name}.webm`;
+        a.download = `${v.name}.mp4`;
         a.click();
         
         setTimeout(() => {
