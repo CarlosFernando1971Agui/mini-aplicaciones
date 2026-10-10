@@ -24,6 +24,12 @@
       <span id="timer-text" class="font-mono text-cyan-400 font-bold text-sm">00:00</span>
     </div>
 
+    <!-- Visualizador de Ondas de Sonido (Canvas) -->
+    <div class="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden h-16 relative flex items-center justify-center">
+      <canvas id="waveform-canvas" class="w-full h-full"></canvas>
+      <span id="waveform-placeholder" class="absolute text-[10px] text-slate-600 font-mono">Monitor de Ondas en Vivo</span>
+    </div>
+
     <!-- Botones Principales de Control -->
     <div id="controls-container" class="grid grid-cols-2 gap-2">
       <button id="btn-record" onclick="toggleRecording()" class="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-3 px-3 rounded-xl transition shadow flex flex-col items-center justify-center space-y-0.5">
@@ -45,7 +51,7 @@
         <span id="tracks-count" class="text-[10px] bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full font-mono">0 pistas</span>
       </div>
 
-      <div id="tracks-list" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+      <div id="tracks-list" class="space-y-2 max-h-56 overflow-y-auto pr-1">
         <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-center text-xs text-slate-500 font-mono">
           No hay pistas grabadas o cargadas.
         </div>
@@ -99,18 +105,36 @@
     let mediaStream = null;
     let scriptNode = null;
     let micSource = null;
+    let analyser = null;
     let isRecording = false;
-    let recordStartTime = 0;
     let timerInterval = null;
+    let animationFrameId = null;
 
-    // Buffer para datos PCM estéreo
     let leftChannelBuffer = [];
     let rightChannelBuffer = [];
     let sampleRate = 44100;
 
-    // Colección de pistas guardadas en la app
     let tracks = [];
     let selectedTrackIndex = null;
+
+    // Inicializar Canvas del visualizador de ondas
+    const canvas = document.getElementById('waveform-canvas');
+    const canvasCtx = canvas.getContext('2d');
+
+    function drawIdleWaveform() {
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = canvas.parentElement.clientHeight;
+      canvasCtx.fillStyle = '#020617';
+      canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+      canvasCtx.lineWidth = 2;
+      canvasCtx.strokeStyle = '#0e7490';
+      canvasCtx.beginPath();
+      canvasCtx.moveTo(0, canvas.height / 2);
+      canvasCtx.lineTo(canvas.width, canvas.height / 2);
+      canvasCtx.stroke();
+    }
+
+    window.onload = drawIdleWaveform;
 
     async function toggleRecording() {
       if (!isRecording) {
@@ -122,7 +146,6 @@
 
     async function startStereoRecording() {
       try {
-        // Inicializar AudioContext si no existe
         if (!audioContext) {
           audioContext = new (window.AudioContext || window.webkitAudioContext)();
         }
@@ -130,7 +153,6 @@
           await audioContext.resume();
         }
 
-        // Solicitar micrófono estéreo explícitamente (channelCount: 2)
         mediaStream = await navigator.mediaDevices.getUserMedia({
           audio: {
             channelCount: 2,
@@ -143,7 +165,11 @@
         sampleRate = audioContext.sampleRate;
         micSource = audioContext.createMediaStreamSource(mediaStream);
 
-        // Procesador de nodos para extraer datos raw PCM de los 2 canales
+        // Analizador para las ondas en tiempo real
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        micSource.connect(analyser);
+
         const bufferSize = 4096;
         scriptNode = audioContext.createScriptProcessor(bufferSize, 2, 2);
 
@@ -163,6 +189,7 @@
         scriptNode.connect(audioContext.destination);
 
         isRecording = true;
+        document.getElementById('waveform-placeholder').style.display = 'none';
         document.getElementById('record-label').textContent = "⏹️ Detener Grabación";
         document.getElementById('btn-record').className = "bg-rose-700 hover:bg-rose-600 text-white font-bold text-xs py-3 px-3 rounded-xl transition shadow flex flex-col items-center justify-center space-y-0.5 animate-pulse";
         document.getElementById('status-text').textContent = "Estado: Grabando Estéreo...";
@@ -177,17 +204,66 @@
           document.getElementById('timer-text').textContent = `${m}:${s}`;
         }, 1000);
 
+        visualizeWaveform();
+
       } catch (err) {
         alert("Error al acceder al micrófono estéreo. Verifica los permisos de audio.");
         console.error(err);
       }
     }
 
+    function visualizeWaveform() {
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      function render() {
+        if (!isRecording) return;
+        animationFrameId = requestAnimationFrame(render);
+
+        analyser.getByteTimeDomainData(dataArray);
+
+        canvas.width = canvas.parentElement.clientWidth;
+        canvas.height = canvas.parentElement.clientHeight;
+
+        canvasCtx.fillStyle = '#020617';
+        canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+        canvasCtx.lineWidth = 2;
+        canvasCtx.strokeStyle = '#22d3ee';
+        canvasCtx.beginPath();
+
+        let sliceWidth = canvas.width * 1.0 / bufferLength;
+        let x = 0;
+
+        for (let i = 0; i < bufferLength; i++) {
+          let v = dataArray[i] / 128.0;
+          let y = v * canvas.height / 2;
+
+          if (i === 0) {
+            canvasCtx.moveTo(x, y);
+          } else {
+            canvasCtx.lineTo(x, y);
+          }
+
+          x += sliceWidth;
+        }
+
+        canvasCtx.lineTo(canvas.width, canvas.height / 2);
+        canvasCtx.stroke();
+      }
+
+      render();
+    }
+
     function stopStereoRecording() {
       isRecording = false;
       clearInterval(timerInterval);
+      cancelAnimationFrame(animationFrameId);
+      drawIdleWaveform();
+      document.getElementById('waveform-placeholder').style.display = 'block';
 
       if (scriptNode) scriptNode.disconnect();
+      if (analyser) analyser.disconnect();
       if (micSource) micSource.disconnect();
       if (mediaStream) {
         mediaStream.getTracks().forEach(track => track.stop());
@@ -223,7 +299,6 @@
         return;
       }
 
-      // Convertir PCM a MP3 Estéreo con lamejs
       const mp3Blob = encodeStereoMp3(leftPCM, rightPCM, sampleRate);
       
       const newTrack = {
@@ -245,10 +320,9 @@
     }
 
     function encodeStereoMp3(leftPCM, rightPCM, sampleRate) {
-      const mp3encoder = new lamejs.Mp3Encoder(2, sampleRate, 128); // 2 Canales (Estéreo), 128 kbps
+      const mp3encoder = new lamejs.Mp3Encoder(2, sampleRate, 128);
       const sampleBlockSize = 1152;
 
-      // Convertir Float32Array (-1.0 a 1.0) a Int16Array (-32768 a 32767)
       const leftInt16 = new Int16Array(leftPCM.length);
       const rightInt16 = new Int16Array(rightPCM.length);
 
@@ -334,22 +408,26 @@
       list.innerHTML = '';
       tracks.forEach((track, index) => {
         const item = document.createElement('div');
-        item.className = "bg-slate-950 border border-slate-800 p-2.5 rounded-xl flex items-center justify-between text-xs space-x-2";
+        item.className = "bg-slate-950 border border-slate-800 p-3 rounded-xl space-y-2";
 
         item.innerHTML = `
-          <div class="flex items-center space-x-2 truncate">
-            <span class="text-base">🎵</span>
-            <div class="truncate">
-              <p class="font-bold text-slate-200 truncate">${track.name}</p>
-              <p class="text-[9px] text-slate-400 font-mono">${track.duration} seg | MP3 Estéreo</p>
+          <div class="flex items-center justify-between text-xs">
+            <div class="flex items-center space-x-2 truncate">
+              <span class="text-base">🎵</span>
+              <div class="truncate">
+                <p class="font-bold text-slate-200 truncate">${track.name}</p>
+                <p class="text-[9px] text-slate-400 font-mono">${track.duration} seg | MP3 Estéreo</p>
+              </div>
+            </div>
+            <div class="flex items-center space-x-1 shrink-0">
+              <button onclick="openEditor(${index})" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-lg font-bold" title="Recortar">✂️</button>
+              <a href="${track.url}" download="${track.name}.mp3" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-lg font-bold" title="Descargar MP3">💾</a>
+              <button onclick="shareWhatsApp(${index})" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-green-400 rounded-lg font-bold" title="WhatsApp">💬</button>
+              <button onclick="deleteTrack(${index})" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-lg font-bold" title="Eliminar">🗑️</button>
             </div>
           </div>
-          <div class="flex items-center space-x-1 shrink-0">
-            <button onclick="openEditor(${index})" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-lg font-bold" title="Recortar">✂️</button>
-            <a href="${track.url}" download="${track.name}.mp3" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-lg font-bold" title="Descargar MP3">💾</a>
-            <button onclick="shareWhatsApp(${index})" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-green-400 rounded-lg font-bold" title="WhatsApp">💬</button>
-            <button onclick="deleteTrack(${index})" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-lg font-bold" title="Eliminar">🗑️</button>
-          </div>
+          <!-- Reproductor de audio directo sin entrar a modales -->
+          <audio controls src="${track.url}" class="w-full h-8 mt-1"></audio>
         `;
         list.appendChild(item);
       });
