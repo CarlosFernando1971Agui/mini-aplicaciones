@@ -3,426 +3,57 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ReporterCam Pro - (c)cfaesoft</title>
+  <title>Portal de Mini Apps - (c)cfaesoft</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    .recording-fullscreen {
-      position: fixed !important;
-      inset: 0 !important;
-      z-index: 9999 !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      border-radius: 0 !important;
-      border: none !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      background-color: #000 !important;
-    }
-  </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen p-4 font-sans flex flex-col items-center justify-center">
 
   <div class="max-w-md w-full bg-slate-900 rounded-2xl shadow-2xl border border-slate-800 p-5 space-y-4">
     
-    <!-- Encabezado -->
-    <header class="border-b border-slate-800 pb-3 flex justify-between items-center">
-      <div>
-        <h1 class="text-base font-black text-cyan-400 tracking-wide uppercase flex items-center space-x-1.5">
-          <span>📹</span> <span>REPORTERCAM PRO</span>
-        </h1>
-        <p class="text-[9px] text-slate-400 tracking-widest uppercase font-mono mt-0.5">(c)cfaesoft - Cámara Periodística de Campo</p>
-      </div>
-      <a href="index.html" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 transition">
-        🏠 Menú
-      </a>
+    <header class="border-b border-slate-800 pb-3 text-center">
+      <h1 class="text-base font-black text-cyan-400 tracking-wide uppercase">🚀 PORTAL DE MINI APPS</h1>
+      <p class="text-[9px] text-slate-400 tracking-widest uppercase font-mono mt-0.5">(c)cfaesoft - Herramientas de Campo</p>
     </header>
 
-    <!-- Datos del Reportaje / Cintillo Televisivo -->
-    <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2 text-xs">
-      <h3 class="text-[10px] font-bold text-cyan-400 uppercase tracking-wider font-mono">📺 Cintillo Informativo (Titular)</h3>
-      <div class="grid grid-cols-2 gap-2">
-        <div class="col-span-2">
-          <label class="text-[10px] text-slate-400">Titular de la Noticia:</label>
-          <input type="text" id="input-title" value="COBERTURA EN VIVO" oninput="updateOverlay()" placeholder="Ej: MANTENIMIENTO DE VÍAS PÚBLICAS" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 mt-0.5 focus:outline-none focus:border-cyan-500 font-bold">
-        </div>
-        <div>
-          <label class="text-[10px] text-slate-400">Reportero / Medio:</label>
-          <input type="text" id="input-reporter" value="Reportero de Calle" oninput="updateOverlay()" placeholder="Ej: Juan Pérez - Prensa" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 mt-0.5 focus:outline-none focus:border-cyan-500 text-[11px]">
-        </div>
-        <div>
-          <label class="text-[10px] text-slate-400">Lugar / Ubicación:</label>
-          <input type="text" id="input-location" value="En el lugar de los hechos" oninput="updateOverlay()" placeholder="Ej: Zona Central" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 mt-0.5 focus:outline-none focus:border-cyan-500 text-[11px]">
-        </div>
-      </div>
-    </div>
-
-    <!-- Visor de Cámara en Vivo -->
-    <div id="camera-container" class="relative bg-black rounded-xl overflow-hidden aspect-video border border-slate-800 flex items-center justify-center transition-all duration-300">
-      <video id="camera-preview" autoplay playsinline muted class="w-full h-full object-cover"></video>
-      
-      <!-- Cuenta Regresiva (Overlay 3, 2, 1) -->
-      <div id="countdown-overlay" class="hidden absolute inset-0 bg-black/80 flex items-center justify-center z-30">
-        <span id="countdown-number" class="text-6xl font-black text-cyan-400 animate-bounce font-mono">3</span>
-      </div>
-
-      <!-- Indicador de Requisito Horizontal -->
-      <div id="orientation-warning" class="absolute top-2 right-2 bg-emerald-500/90 text-slate-950 text-[9px] font-bold px-2 py-0.5 rounded-full font-mono flex items-center space-x-1 z-10">
-        <span>🔄</span> <span id="orientation-text">Modo Horizontal Preferido</span>
-      </div>
-
-      <!-- Temporizador Flotante de Grabación Real -->
-      <div id="recording-timer" class="hidden absolute top-4 left-4 bg-rose-600/90 text-white font-mono font-bold text-sm px-3 py-1.5 rounded-xl animate-pulse flex items-center space-x-2 shadow-2xl z-20">
-        <span>🔴 REC</span> <span id="timer-text">00:00</span>
-      </div>
-
-      <!-- Botón Flotante para Detener la Grabación en Pantalla Completa -->
-      <button id="btn-stop-floating" onclick="stopRecording()" class="hidden absolute top-4 right-4 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-2xl z-20 flex items-center space-x-1.5 border border-white/20">
-        <span>⏹️</span> <span>Detener Grabación</span>
-      </button>
-
-      <!-- Superposición de Titular / TV Lower Third -->
-      <div id="tv-overlay" class="absolute bottom-3 left-3 right-3 bg-slate-950/85 backdrop-blur-md border-l-4 border-cyan-400 p-2.5 text-left rounded-r-lg shadow-2xl z-10">
-        <p id="overlay-title" class="text-xs sm:text-sm font-black text-slate-100 uppercase leading-tight truncate">COBERTURA EN VIVO</p>
-        <p class="text-[9px] sm:text-[10px] text-cyan-400 font-mono mt-0.5 truncate">
-          <span id="overlay-reporter">Reportero de Calle</span> • <span id="overlay-location" class="text-slate-300">En el lugar de los hechos</span>
-        </p>
-      </div>
-    </div>
-
-    <!-- Botones de Control de Grabación -->
-    <div class="grid grid-cols-2 gap-2">
-      <button id="btn-record" onclick="prepareRecording()" class="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-3 px-3 rounded-xl transition shadow flex items-center justify-center space-x-1.5">
-        <span>🔴</span> <span id="record-label">Grabar Video</span>
-      </button>
-
-      <button id="btn-switch-cam" onclick="switchCamera()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs py-3 px-3 rounded-xl transition shadow flex items-center justify-center space-x-1.5">
-        <span>🔄</span> <span>Cambiar Cámara</span>
-      </button>
-    </div>
-
-    <!-- Lista de Videos Grabados -->
     <div class="space-y-2">
-      <div class="flex justify-between items-center text-xs font-bold text-slate-300 uppercase tracking-wider">
-        <span>Videos Capturados:</span>
-        <span id="videos-count" class="text-[10px] bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full font-mono">0 videos</span>
-      </div>
-
-      <div id="videos-list" class="space-y-2 max-h-56 overflow-y-auto pr-1">
-        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-center text-xs text-slate-500 font-mono">
-          No hay videos grabados aún.
+      <!-- Botón Agenda de Contactos -->
+      <a href="agenda.html" class="block bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 p-3 rounded-xl transition shadow group">
+        <div class="flex items-center space-x-3">
+          <span class="text-2xl">📖</span>
+          <div>
+            <h2 class="text-xs font-bold text-slate-100 group-hover:text-cyan-400">Agenda de Prensa</h2>
+            <p class="text-[10px] text-slate-400 font-mono">Directorio de contactos, llamadas y WhatsApp</p>
+          </div>
         </div>
-      </div>
+      </a>
+
+      <!-- Botón AudioStudio Pro -->
+      <a href="grabadora.html" class="block bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 p-3 rounded-xl transition shadow group">
+        <div class="flex items-center space-x-3">
+          <span class="text-2xl">🎙️</span>
+          <div>
+            <h2 class="text-xs font-bold text-slate-100 group-hover:text-cyan-400">AudioStudio Pro</h2>
+            <p class="text-[10px] text-slate-400 font-mono">Grabador estéreo, recortador y mezclador MP3</p>
+          </div>
+        </div>
+      </a>
+
+      <!-- Botón ReporterCam Pro -->
+      <a href="camara.html" class="block bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 p-3 rounded-xl transition shadow group">
+        <div class="flex items-center space-x-3">
+          <span class="text-2xl">📹</span>
+          <div>
+            <h2 class="text-xs font-bold text-slate-100 group-hover:text-cyan-400">ReporterCam Pro</h2>
+            <p class="text-[10px] text-slate-400 font-mono">Cámara de video con cintillo televisivo y audio mejorado</p>
+          </div>
+        </div>
+      </a>
     </div>
 
-    <footer class="text-center pt-1 border-t border-slate-800/80">
-      <p class="text-[9px] text-slate-500 font-mono">ReporterCam Pro - Captura e Integración de Prensa</p>
+    <footer class="text-center pt-2 border-t border-slate-800/80">
+      <p class="text-[9px] text-slate-500 font-mono">https://carlosfernando1971agui.github.io/mini-aplicaciones/</p>
     </footer>
   </div>
 
-  <script>
-    let rawStream = null;
-    let audioContext = null;
-    let gainNode = null;
-    let mediaRecorder = null;
-    let recordedChunks = [];
-    let isRecording = false;
-    let currentFacingMode = 'environment';
-    let timerInterval = null;
-    let videos = [];
-
-    const videoPreview = document.getElementById('camera-preview');
-    const cameraContainer = document.getElementById('camera-container');
-
-    function isLandscapeMode() {
-      const isAngleLandscape = window.screen && window.screen.orientation && window.screen.orientation.type ? window.screen.orientation.type.includes('landscape') : false;
-      const isWindowLandscape = window.innerWidth > window.innerHeight;
-      const isLegacyLandscape = Math.abs(window.orientation || 0) === 90;
-
-      return isAngleLandscape || isWindowLandscape || isLegacyLandscape;
-    }
-
-    function checkOrientationStatus() {
-      const warningText = document.getElementById('orientation-text');
-      const warningBadge = document.getElementById('orientation-warning');
-
-      if (isLandscapeMode()) {
-        warningText.textContent = "Horizontal OK ✅";
-        warningBadge.className = "absolute top-2 right-2 bg-emerald-500/90 text-slate-950 text-[9px] font-bold px-2 py-0.5 rounded-full font-mono flex items-center space-x-1 z-10";
-      } else {
-        warningText.textContent = "Gira a Horizontal 🔄";
-        warningBadge.className = "absolute top-2 right-2 bg-amber-500/90 text-slate-950 text-[9px] font-bold px-2 py-0.5 rounded-full font-mono flex items-center space-x-1 z-10";
-      }
-    }
-
-    window.addEventListener('resize', checkOrientationStatus);
-    window.addEventListener('orientationchange', checkOrientationStatus);
-
-    function updateOverlay() {
-      const title = document.getElementById('input-title').value.trim() || 'SIN TITULAR';
-      const reporter = document.getElementById('input-reporter').value.trim() || 'Prensa';
-      const location = document.getElementById('input-location').value.trim() || 'En Campo';
-
-      document.getElementById('overlay-title').textContent = title;
-      document.getElementById('overlay-reporter').textContent = reporter;
-      document.getElementById('overlay-location').textContent = location;
-    }
-
-    async function initCamera() {
-      if (rawStream) {
-        rawStream.getTracks().forEach(track => track.stop());
-      }
-
-      try {
-        rawStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          }
-        });
-
-        videoPreview.srcObject = rawStream;
-        checkOrientationStatus();
-      } catch (err) {
-        alert("No se pudo acceder a la cámara o micrófono. Otorga los permisos en el navegador.");
-        console.error(err);
-      }
-    }
-
-    function switchCamera() {
-      currentFacingMode = (currentFacingMode === 'environment') ? 'user' : 'environment';
-      initCamera();
-    }
-
-    function prepareRecording() {
-      if (isRecording) {
-        stopRecording();
-        return;
-      }
-
-      // Proceso directo a pantalla completa horizontal
-      enterFullscreenMode();
-
-      const countdownOverlay = document.getElementById('countdown-overlay');
-      const countdownNumber = document.getElementById('countdown-number');
-      countdownOverlay.classList.remove('hidden');
-
-      let count = 3;
-      countdownNumber.textContent = count;
-
-      let countdownInterval = setInterval(() => {
-        count--;
-        if (count > 0) {
-          countdownNumber.textContent = count;
-        } else {
-          clearInterval(countdownInterval);
-          countdownOverlay.classList.add('hidden');
-          startRecordingAction();
-        }
-      }, 1000);
-    }
-
-    async function enterFullscreenMode() {
-      try {
-        if (cameraContainer.requestFullscreen) {
-          await cameraContainer.requestFullscreen();
-        } else if (cameraContainer.webkitRequestFullscreen) {
-          await cameraContainer.webkitRequestFullscreen();
-        }
-
-        if (screen.orientation && screen.orientation.lock) {
-          await screen.orientation.lock('landscape').catch(() => {});
-        }
-      } catch (err) {
-        console.log("Modo pantalla completa procesado.");
-      }
-      cameraContainer.classList.add('recording-fullscreen');
-    }
-
-    function startRecordingAction() {
-      if (!rawStream) return;
-
-      document.getElementById('btn-stop-floating').classList.remove('hidden');
-
-      // Configuración de audio amplificado (+250% volumen de captura)
-      if (!audioContext) {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      if (audioContext.state === 'suspended') {
-        audioContext.resume();
-      }
-
-      const audioSource = audioContext.createMediaStreamSource(rawStream);
-      gainNode = audioContext.createGain();
-      gainNode.gain.value = 2.5; // Amplificación de volumen
-
-      const destinationNode = audioContext.createMediaStreamDestination();
-      audioSource.connect(gainNode);
-      gainNode.connect(destinationNode);
-
-      // Combinar video + audio amplificado
-      const combinedStream = new MediaStream([
-        ...rawStream.getVideoTracks(),
-        ...destinationNode.stream.getAudioTracks()
-      ]);
-
-      recordedChunks = [];
-      let options = { mimeType: 'video/webm;codecs=vp9,opus' };
-
-      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-        options = { mimeType: 'video/mp4' };
-      }
-
-      try {
-        mediaRecorder = new MediaRecorder(combinedStream, options);
-      } catch (e) {
-        mediaRecorder = new MediaRecorder(combinedStream);
-      }
-
-      mediaRecorder.ondataavailable = function(e) {
-        if (e.data.size > 0) {
-          recordedChunks.push(e.data);
-        }
-      };
-
-      mediaRecorder.onstop = saveVideo;
-
-      mediaRecorder.start(1000);
-      isRecording = true;
-
-      document.getElementById('record-label').textContent = "Detener Grabación";
-      document.getElementById('btn-record').className = "bg-rose-700 hover:bg-rose-600 text-white font-bold text-xs py-3 px-3 rounded-xl transition shadow flex items-center justify-center space-x-1.5 animate-pulse";
-      document.getElementById('recording-timer').classList.remove('hidden');
-
-      let seconds = 0;
-      document.getElementById('timer-text').textContent = "00:00";
-      timerInterval = setInterval(() => {
-        seconds++;
-        let m = String(Math.floor(seconds / 60)).padStart(2, '0');
-        let s = String(seconds % 60).padStart(2, '0');
-        document.getElementById('timer-text').textContent = `${m}:${s}`;
-      }, 1000);
-    }
-
-    function stopRecording() {
-      if (!isRecording) return;
-
-      isRecording = false;
-      clearInterval(timerInterval);
-      document.getElementById('recording-timer').classList.add('hidden');
-      document.getElementById('btn-stop-floating').classList.add('hidden');
-      document.getElementById('countdown-overlay').classList.add('hidden');
-
-      cameraContainer.classList.remove('recording-fullscreen');
-
-      if (document.exitFullscreen) {
-        document.exitFullscreen().catch(() => {});
-      } else if (document.webkitExitFullscreen) {
-        document.webkitExitFullscreen().catch(() => {});
-      }
-
-      if (screen.orientation && screen.orientation.unlock) {
-        screen.orientation.unlock();
-      }
-
-      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        mediaRecorder.stop();
-      }
-
-      document.getElementById('record-label').textContent = "Grabar Video";
-      document.getElementById('btn-record').className = "bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-3 px-3 rounded-xl transition shadow flex items-center justify-center space-x-1.5";
-    }
-
-    function saveVideo() {
-      const blob = new Blob(recordedChunks, { type: 'video/mp4' });
-      const title = document.getElementById('input-title').value.trim() || 'Reporte';
-      
-      const newVideo = {
-        id: Date.now(),
-        name: `${title} - ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
-        blob: blob,
-        url: URL.createObjectURL(blob)
-      };
-
-      videos.unshift(newVideo);
-      renderVideos();
-    }
-
-    function renderVideos() {
-      const list = document.getElementById('videos-list');
-      document.getElementById('videos-count').textContent = `${videos.length} videos`;
-
-      if (videos.length === 0) {
-        list.innerHTML = `<div class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-center text-xs text-slate-500 font-mono">No hay videos grabados aún.</div>`;
-        return;
-      }
-
-      list.innerHTML = '';
-      videos.forEach((v, index) => {
-        const item = document.createElement('div');
-        item.className = "bg-slate-950 border border-slate-800 p-3 rounded-xl space-y-2";
-
-        item.innerHTML = `
-          <div class="flex items-center justify-between text-xs">
-            <div class="flex items-center space-x-2 truncate pr-2">
-              <span class="text-base">🎬</span>
-              <p class="font-bold text-slate-100 truncate">${v.name}</p>
-            </div>
-            <div class="flex items-center space-x-1.5 shrink-0">
-              <a href="${v.url}" download="${v.name}.mp4" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-xs shadow flex items-center space-x-1" title="Guardar Video">
-                <span>💾</span> <span class="hidden sm:inline">Guardar</span>
-              </a>
-              <button onclick="shareWhatsApp(${index})" class="px-2.5 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold text-xs shadow flex items-center space-x-1" title="Enviar por WhatsApp">
-                <span>💬</span> <span class="hidden sm:inline">WA</span>
-              </button>
-              <button onclick="deleteVideo(${index})" class="px-2 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-bold text-xs shadow flex items-center" title="Eliminar">
-                <span>🗑️</span>
-              </button>
-            </div>
-          </div>
-          <video controls src="${v.url}" class="w-full rounded-lg h-36 bg-black object-contain mt-1"></video>
-        `;
-        list.appendChild(item);
-      });
-    }
-
-    function shareWhatsApp(index) {
-      const v = videos[index];
-      if (!v) return;
-
-      const file = new File([v.blob], `${v.name}.mp4`, { type: 'video/mp4' });
-
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        navigator.share({
-          files: [file],
-          title: v.name,
-          text: `Reportaje: ${v.name}`
-        }).catch((err) => {
-          console.log("Cancelado o no compatible.");
-        });
-      } else {
-        // Enlace de respaldo para WhatsApp con descarga guiada
-        const a = document.createElement('a');
-        a.href = v.url;
-        a.download = `${v.name}.mp4`;
-        a.click();
-        
-        setTimeout(() => {
-          window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent('Adjunto video reportaje: ' + v.name)}`, '_blank');
-        }, 500);
-      }
-    }
-
-    function deleteVideo(index) {
-      videos.splice(index, 1);
-      renderVideos();
-    }
-
-    window.onload = () => {
-      initCamera();
-      updateOverlay();
-    };
-  </script>
 </body>
 </html>
