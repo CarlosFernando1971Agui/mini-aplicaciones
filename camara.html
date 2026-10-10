@@ -55,6 +55,15 @@
           <input type="text" id="input-location" value="En el lugar de los hechos" oninput="updateOverlay()" placeholder="Ej: Zona Central" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 mt-0.5 focus:outline-none focus:border-cyan-500 text-[11px]">
         </div>
       </div>
+
+      <!-- Control de Ganancia de Micrófono (+200% a +300%) -->
+      <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+        <label for="gain-slider" class="text-[10px] font-bold text-amber-400 font-mono flex items-center space-x-1">
+          <span>🎙️ Amplificación Mic:</span>
+          <span id="gain-value" class="text-cyan-400 font-black">250%</span>
+        </label>
+        <input type="range" id="gain-slider" min="100" max="350" value="250" step="10" oninput="updateGainValue(this.value)" class="w-1/2 accent-cyan-400 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+      </div>
     </div>
 
     <!-- Visor de Cámara en Vivo -->
@@ -121,16 +130,28 @@
   </div>
 
   <script>
-    let mediaStream = null;
+    let rawMediaStream = null;
+    let processedMediaStream = null;
+    let audioContext = null;
+    let gainNode = null;
     let mediaRecorder = null;
     let recordedChunks = [];
     let isRecording = false;
     let currentFacingMode = 'environment';
     let timerInterval = null;
     let videos = [];
+    let currentGainFactor = 2.5; // +250% Boost por defecto
 
     const videoPreview = document.getElementById('camera-preview');
     const cameraContainer = document.getElementById('camera-container');
+
+    function updateGainValue(val) {
+      currentGainFactor = parseFloat(val) / 100;
+      document.getElementById('gain-value').textContent = `${val}%`;
+      if (gainNode) {
+        gainNode.gain.setTargetAtTime(currentGainFactor, audioContext.currentTime, 0.05);
+      }
+    }
 
     function isLandscape() {
       if (window.orientation !== undefined) {
@@ -166,17 +187,50 @@
     }
 
     async function initCamera() {
-      if (mediaStream) {
-        mediaStream.getTracks().forEach(track => track.stop());
+      if (rawMediaStream) {
+        rawMediaStream.getTracks().forEach(track => track.stop());
       }
 
       try {
-        mediaStream = await navigator.mediaDevices.getUserMedia({
+        // Capturar stream original de cámara y micrófono
+        rawMediaStream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: true
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false }
         });
 
-        videoPreview.srcObject = mediaStream;
+        // Configurar pipeline de amplificación Web Audio API
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        audioContext = new AudioCtx();
+
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume();
+        }
+
+        const sourceNode = audioContext.createMediaStreamSource(rawMediaStream);
+        gainNode = audioContext.createGain();
+        gainNode.gain.setValueAtTime(currentGainFactor, audioContext.currentTime);
+
+        // Compresor dinámico para impedir distorsión con alto volumen
+        const compressor = audioContext.createDynamicsCompressor();
+        compressor.threshold.setValueAtTime(-24, audioContext.currentTime);
+        compressor.knee.setValueAtTime(30, audioContext.currentTime);
+        compressor.ratio.setValueAtTime(12, audioContext.currentTime);
+        compressor.attack.setValueAtTime(0.003, audioContext.currentTime);
+        compressor.release.setValueAtTime(0.25, audioContext.currentTime);
+
+        const destinationNode = audioContext.createMediaStreamDestination();
+
+        sourceNode.connect(gainNode);
+        gainNode.connect(compressor);
+        compressor.connect(destinationNode);
+
+        // Unir el video original con el audio amplificado
+        processedMediaStream = new MediaStream([
+          ...rawMediaStream.getVideoTracks(),
+          ...destinationNode.stream.getAudioTracks()
+        ]);
+
+        videoPreview.srcObject = rawMediaStream;
         checkOrientationStatus();
       } catch (err) {
         alert("No se pudo acceder a la cámara o micrófono. Otorga los permisos en el navegador.");
@@ -189,20 +243,21 @@
       initCamera();
     }
 
-    // Función que inicia la cuenta regresiva antes de grabar
     function prepareRecording() {
       if (isRecording) {
         stopRecording();
         return;
       }
 
-      // Validación estricta de orientación horizontal
       if (!isLandscape()) {
         alert("⚠️ ATENCIÓN: Debes colocar tu celular en posición HORIZONTAL (echado) antes de iniciar la grabación.");
         return;
       }
 
-      // Entrar en pantalla completa horizontal para la cuenta regresiva
+      if (audioContext && audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+
       enterFullscreenMode();
 
       const countdownOverlay = document.getElementById('countdown-overlay');
@@ -242,7 +297,8 @@
     }
 
     function startRecordingAction() {
-      if (!mediaStream) return;
+      const activeStream = processedMediaStream || rawMediaStream;
+      if (!activeStream) return;
 
       document.getElementById('btn-stop-floating').classList.remove('hidden');
 
@@ -254,9 +310,9 @@
       }
 
       try {
-        mediaRecorder = new MediaRecorder(mediaStream);
+        mediaRecorder = new MediaRecorder(activeStream, options);
       } catch (e) {
-        mediaRecorder = new MediaRecorder(mediaStream);
+        mediaRecorder = new MediaRecorder(activeStream);
       }
 
       mediaRecorder.ondataavailable = function(e) {
@@ -293,7 +349,6 @@
       document.getElementById('btn-stop-floating').classList.add('hidden');
       document.getElementById('countdown-overlay').classList.add('hidden');
 
-      // Salir de pantalla completa y restaurar la interfaz
       cameraContainer.classList.remove('recording-fullscreen');
 
       if (document.exitFullscreen) {
@@ -315,14 +370,16 @@
     }
 
     function saveVideo() {
-      const blob = new Blob(recordedChunks, { type: 'video/mp4' });
+      const mime = mediaRecorder ? mediaRecorder.mimeType : 'video/mp4';
+      const blob = new Blob(recordedChunks, { type: mime });
       const title = document.getElementById('input-title').value.trim() || 'Reporte';
       
       const newVideo = {
         id: Date.now(),
         name: `${title} - ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
         blob: blob,
-        url: URL.createObjectURL(blob)
+        url: URL.createObjectURL(blob),
+        mime: mime
       };
 
       videos.unshift(newVideo);
@@ -349,15 +406,14 @@
               <span class="text-base">🎬</span>
               <p class="font-bold text-slate-100 truncate">${v.name}</p>
             </div>
-            <!-- Botones altamente visibles y con diseño táctil mejorado -->
             <div class="flex items-center space-x-1.5 shrink-0">
-              <a href="${v.url}" download="${v.name}.mp4" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-xs shadow flex items-center space-x-1" title="Guardar Video">
+              <a href="${v.url}" download="${v.name}.mp4" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-xs shadow flex items-center space-x-1 transition" title="Guardar Video">
                 <span>💾</span> <span class="hidden sm:inline">Guardar</span>
               </a>
-              <button onclick="shareWhatsApp(${index})" class="px-2.5 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold text-xs shadow flex items-center space-x-1" title="Enviar por WhatsApp">
+              <button onclick="shareWhatsApp(${index})" class="px-2.5 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold text-xs shadow flex items-center space-x-1 transition" title="Enviar por WhatsApp">
                 <span>💬</span> <span class="hidden sm:inline">WA</span>
               </button>
-              <button onclick="deleteVideo(${index})" class="px-2 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-bold text-xs shadow flex items-center" title="Eliminar">
+              <button onclick="deleteVideo(${index})" class="px-2 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-bold text-xs shadow flex items-center transition" title="Eliminar">
                 <span>🗑️</span>
               </button>
             </div>
@@ -368,30 +424,27 @@
       });
     }
 
-    function shareWhatsApp(index) {
+    async function shareWhatsApp(index) {
       const v = videos[index];
       if (!v) return;
 
-      const file = new File([v.blob], `${v.name}.mp4`, { type: 'video/mp4' });
+      const ext = v.mime.includes('mp4') ? 'mp4' : 'webm';
+      const file = new File([v.blob], `${v.name}.${ext}`, { type: v.mime });
 
+      // INTENTO 1: Web Share API nativa (Soportada en navegadores móviles Chrome / Safari)
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        navigator.share({
-          files: [file]
-        }).catch(() => {});
-      } else {
-        alert("Descarga el video usando el botón 'Guardar' y adjúntalo manualmente en WhatsApp.");
+        try {
+          await navigator.share({
+            title: v.name,
+            text: `📹 Video Informativo: ${v.name}`,
+            files: [file]
+          });
+          return;
+        } catch (err) {
+          if (err.name === 'AbortError') return; // Usuario canceló la acción
+          console.warn("Fallo Web Share API, procediendo a respaldo fallback:", err);
+        }
       }
-    }
 
-    function deleteVideo(index) {
-      videos.splice(index, 1);
-      renderVideos();
-    }
-
-    window.onload = () => {
-      initCamera();
-      updateOverlay();
-    };
-  </script>
-</body>
-</html>
+      // INTENTO 2: Fallback automático si el navegador no permite compartir archivos directamente
+      const textMsg = encodeURIComponent(`📹 Reporte de Prensa: *${v.name}*\n*(El video grabado fue descargado en tu dispositivo para adjuntarlo a este chat)*`);
