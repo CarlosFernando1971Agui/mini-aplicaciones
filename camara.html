@@ -32,7 +32,7 @@
         </h1>
         <p class="text-[9px] text-slate-400 tracking-widest uppercase font-mono mt-0.5">(c)cfaesoft - Cámara Periodística de Campo</p>
       </div>
-      <a href="index.html" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 transition">
+      <a href="./index.html" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 transition">
         🏠 Menú
       </a>
     </header>
@@ -154,7 +154,7 @@
 
         videoPreview.srcObject = mediaStream;
       } catch (err) {
-        alert("No se pudo acceder a la cámara o micrófono. Verifica los permisos en tu navegador.");
+        alert("No se pudo acceder a la cámara o micrófono. Otorga los permisos necesarios.");
         console.error(err);
       }
     }
@@ -170,7 +170,6 @@
         return;
       }
 
-      // Activar pantalla completa
       enterFullscreenMode();
 
       const countdownOverlay = document.getElementById('countdown-overlay');
