@@ -27,7 +27,7 @@
     <!-- Visualizador de Ondas de Sonido (Canvas) -->
     <div class="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden h-16 relative flex items-center justify-center">
       <canvas id="waveform-canvas" class="w-full h-full"></canvas>
-      <span id="waveform-placeholder" class="absolute text-[10px] text-slate-600 font-mono">Monitor de Ondas en Vivo</span>
+      <span id="waveform-placeholder" class="absolute text-[10px] text-slate-500 font-mono">Monitor de Ondas en Vivo</span>
     </div>
 
     <!-- Botones Principales de Control -->
@@ -117,7 +117,6 @@
     let tracks = [];
     let selectedTrackIndex = null;
 
-    // Inicializar Canvas del visualizador de ondas
     const canvas = document.getElementById('waveform-canvas');
     const canvasCtx = canvas.getContext('2d');
 
@@ -165,7 +164,6 @@
         sampleRate = audioContext.sampleRate;
         micSource = audioContext.createMediaStreamSource(mediaStream);
 
-        // Analizador para las ondas en tiempo real
         analyser = audioContext.createAnalyser();
         analyser.fftSize = 256;
         micSource.connect(analyser);
@@ -412,21 +410,30 @@
 
         item.innerHTML = `
           <div class="flex items-center justify-between text-xs">
-            <div class="flex items-center space-x-2 truncate">
+            <div class="flex items-center space-x-2 truncate pr-2">
               <span class="text-base">🎵</span>
               <div class="truncate">
-                <p class="font-bold text-slate-200 truncate">${track.name}</p>
-                <p class="text-[9px] text-slate-400 font-mono">${track.duration} seg | MP3 Estéreo</p>
+                <p class="font-bold text-slate-100 truncate">${track.name}</p>
+                <p class="text-[9px] text-cyan-400 font-mono">${track.duration} seg | MP3 Estéreo</p>
               </div>
             </div>
-            <div class="flex items-center space-x-1 shrink-0">
-              <button onclick="openEditor(${index})" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-lg font-bold" title="Recortar">✂️</button>
-              <a href="${track.url}" download="${track.name}.mp3" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-lg font-bold" title="Descargar MP3">💾</a>
-              <button onclick="shareWhatsApp(${index})" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-green-400 rounded-lg font-bold" title="WhatsApp">💬</button>
-              <button onclick="deleteTrack(${index})" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-lg font-bold" title="Eliminar">🗑️</button>
+            <!-- Botones de acción altamente visibles -->
+            <div class="flex items-center space-x-1.5 shrink-0">
+              <button onclick="openEditor(${index})" class="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-bold text-xs shadow flex items-center space-x-1" title="Recortar">
+                <span>✂️</span> <span class="hidden sm:inline">Cortar</span>
+              </button>
+              <a href="${track.url}" download="${track.name}.mp3" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-xs shadow flex items-center space-x-1" title="Guardar MP3">
+                <span>💾</span> <span class="hidden sm:inline">Guardar</span>
+              </a>
+              <button onclick="shareWhatsApp(${index})" class="px-2.5 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold text-xs shadow flex items-center space-x-1" title="WhatsApp">
+                <span>💬</span> <span class="hidden sm:inline">WA</span>
+              </button>
+              <button onclick="deleteTrack(${index})" class="px-2 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-bold text-xs shadow flex items-center" title="Eliminar">
+                <span>🗑️</span>
+              </button>
             </div>
           </div>
-          <!-- Reproductor de audio directo sin entrar a modales -->
+          <!-- Reproductor de audio directo -->
           <audio controls src="${track.url}" class="w-full h-8 mt-1"></audio>
         `;
         list.appendChild(item);
