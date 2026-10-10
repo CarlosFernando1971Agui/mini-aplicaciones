@@ -16,27 +16,30 @@
         <h1 class="text-base font-black text-cyan-400 tracking-wide uppercase flex items-center space-x-1.5">
           <span>📝</span> <span>VOXNOTE PRO</span>
         </h1>
-        <p class="text-[9px] text-slate-400 tracking-widest uppercase font-mono mt-0.5">(c)cfaesoft - Notas y Dictado de Voz</p>
+        <p class="text-[9px] text-slate-400 tracking-widest uppercase font-mono mt-0.5">(c)cfaesoft - Notas y Dictado Directo</p>
       </div>
       <div id="mic-status-badge" class="bg-slate-800 text-slate-400 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 font-mono">
         MIC LISTO
       </div>
     </header>
 
-    <!-- Formulario de Creación / Edición de Nota -->
-    <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2 text-xs">
+    <!-- Formulario de Edición Directa y Acciones Rápidas -->
+    <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2.5 text-xs">
       <div class="flex justify-between items-center">
-        <h3 id="form-title" class="text-[10px] font-bold text-cyan-400 uppercase tracking-wider font-mono">✍️ Nuevo Audiotexto / Nota</h3>
-        <button type="button" onclick="resetForm()" class="text-[10px] text-slate-400 hover:text-white font-mono underline">➕ Nuevo</button>
+        <h3 id="form-title" class="text-[10px] font-bold text-cyan-400 uppercase tracking-wider font-mono">✍️ Panel de Dictado y Edición</h3>
+        <button type="button" onclick="clearWorkspace()" class="text-[10px] text-rose-400 hover:text-rose-300 font-mono underline flex items-center space-x-1">
+          <span>🗑️ Limpiar / Borrar</span>
+        </button>
       </div>
       
       <input type="hidden" id="edit-index" value="-1">
 
       <div class="space-y-2">
-        <input type="text" id="input-title" placeholder="Título de la nota..." class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none focus:border-cyan-500 font-bold text-xs">
+        <input type="text" id="input-title" placeholder="Título o tema del apunte..." class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none focus:border-cyan-500 font-bold text-xs">
         
         <div class="relative">
-          <textarea id="input-content" rows="4" placeholder="Escribe aquí, dicta por voz o edita el texto..." class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none focus:border-cyan-500 text-xs resize-none"></textarea>
+          <!-- Cuadro de texto totalmente editable para corregir antes de enviar -->
+          <textarea id="input-content" rows="4" placeholder="Dicta con el micrófono o corrige aquí mismo el texto libremente..." class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 focus:outline-none focus:border-cyan-500 text-xs resize-none leading-relaxed"></textarea>
         </div>
 
         <div class="flex items-center justify-between pt-1">
@@ -47,32 +50,39 @@
             <option value="Idea">💡 Idea</option>
           </select>
 
-          <!-- Botones de Control: Dictado y Guardar -->
+          <!-- Botones de Control Rápido -->
           <div class="flex space-x-1.5">
             <button type="button" id="btn-dictate" onclick="toggleDictation()" class="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs px-3 py-2 rounded-lg transition shadow flex items-center space-x-1" title="Dictar por voz">
               <span>🎙️</span> <span id="dictate-label">Dictar</span>
             </button>
-            <button type="button" onclick="saveNote()" id="btn-save" class="bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition shadow">
-              💾 Guardar
-            </button>
           </div>
+        </div>
+
+        <!-- Acciones Directas Inmediatas (Sin necesidad de guardar primero) -->
+        <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-900">
+          <button type="button" onclick="sendDirectWhatsApp()" class="bg-green-600 hover:bg-green-500 text-white font-bold text-xs py-2.5 px-3 rounded-lg transition shadow flex items-center justify-center space-x-1.5">
+            <span>💬</span> <span>Enviar WhatsApp</span>
+          </button>
+          <button type="button" onclick="saveNote()" id="btn-save" class="bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-xs py-2.5 px-3 rounded-lg transition shadow flex items-center justify-center space-x-1.5">
+            <span>💾</span> <span>Guardar en Lista</span>
+          </button>
         </div>
       </div>
     </div>
 
     <!-- Buscador y Filtro -->
     <div class="flex space-x-2">
-      <input type="text" id="search-box" oninput="renderNotes()" placeholder="🔍 Buscar notas..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+      <input type="text" id="search-box" oninput="renderNotes()" placeholder="🔍 Buscar en notas guardadas..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
     </div>
 
     <!-- Lista de Notas Guardadas -->
     <div class="space-y-2">
       <div class="flex justify-between items-center text-xs font-bold text-slate-300 uppercase tracking-wider">
-        <span>Notas Guardadas:</span>
+        <span>Historial de Notas:</span>
         <span id="notes-count" class="text-[10px] bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full font-mono">0 notas</span>
       </div>
 
-      <div id="notes-list" class="space-y-2 max-h-64 overflow-y-auto pr-1">
+      <div id="notes-list" class="space-y-2 max-h-56 overflow-y-auto pr-1">
         <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-center text-xs text-slate-500 font-mono">
           No hay notas guardadas aún.
         </div>
@@ -120,19 +130,12 @@
           document.getElementById('input-content').value = accumulatedText + currentSessionText;
         };
 
-        recognition.onerror = (e) => {
-          console.log("Error de voz: ", e.error);
-        };
-
         recognition.onend = () => {
-          // Si el navegador cortó el audio pero el usuario no presionó detener, reiniciamos automáticamente sin perder texto
           if (isListening && !manualStop) {
             try {
               recognition.start();
               return;
-            } catch (err) {
-              console.log("Reinicio automático evitado.");
-            }
+            } catch (err) {}
           }
           stopDictationUI();
         };
@@ -143,7 +146,7 @@
 
     function toggleDictation() {
       if (!recognition) {
-        alert("Tu navegador no soporta el dictado por voz nativo.");
+        alert("Tu navegador no soporta el dictado por voz.");
         return;
       }
       if (!isListening) {
@@ -162,6 +165,27 @@
       document.getElementById('btn-dictate').className = "bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs px-3 py-2 rounded-lg transition shadow flex items-center space-x-1";
       document.getElementById('mic-status-badge').textContent = "MIC LISTO";
       document.getElementById('mic-status-badge').className = "bg-slate-800 text-slate-400 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 font-mono";
+    }
+
+    function sendDirectWhatsApp() {
+      if (isListening) {
+        manualStop = true;
+        isListening = false;
+        recognition.stop();
+      }
+
+      const title = document.getElementById('input-title').value.trim();
+      const content = document.getElementById('input-content').value.trim();
+      const category = document.getElementById('input-category').value;
+
+      if (!content) {
+        alert("Escribe o dicta algún texto antes de enviar por WhatsApp.");
+        return;
+      }
+
+      const formattedTitle = title || "APUNTE DE CAMPO";
+      const text = `*${formattedTitle}* (${category})\n\n${content}\n\n_Enviado desde VoxNote Pro - (c)cfaesoft_`;
+      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
     }
 
     function saveNote() {
@@ -200,7 +224,7 @@
       }
 
       syncLocalStorage();
-      resetForm();
+      clearWorkspace();
       renderNotes();
     }
 
@@ -213,18 +237,23 @@
       document.getElementById('input-category').value = note.category;
       document.getElementById('edit-index').value = index;
 
-      document.getElementById('form-title').textContent = "✏️ Editando Nota";
-      document.getElementById('btn-save').textContent = "💾 Actualizar";
+      document.getElementById('form-title').textContent = "✏️ Editando Nota del Historial";
+      document.getElementById('btn-save').innerHTML = "<span>💾</span> <span>Actualizar Nota</span>";
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    function resetForm() {
+    function clearWorkspace() {
+      if (isListening) {
+        manualStop = true;
+        isListening = false;
+        recognition.stop();
+      }
       document.getElementById('input-title').value = '';
       document.getElementById('input-content').value = '';
       document.getElementById('input-category').value = 'General';
       document.getElementById('edit-index').value = -1;
-      document.getElementById('form-title').textContent = "✍️ Nuevo Audiotexto / Nota";
-      document.getElementById('btn-save').textContent = "💾 Guardar";
+      document.getElementById('form-title').textContent = "✍️ Panel de Dictado y Edición";
+      document.getElementById('btn-save').innerHTML = "<span>💾</span> <span>Guardar en Lista</span>";
     }
 
     function syncLocalStorage() {
@@ -244,7 +273,7 @@
       document.getElementById('notes-count').textContent = `${filteredNotes.length} notas`;
 
       if (filteredNotes.length === 0) {
-        list.innerHTML = `<div class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-center text-xs text-slate-500 font-mono">No se encontraron notas.</div>`;
+        list.innerHTML = `<div class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-center text-xs text-slate-500 font-mono">No hay notas guardadas.</div>`;
         return;
       }
 
@@ -252,7 +281,7 @@
       filteredNotes.forEach((note) => {
         const realIndex = notes.findIndex(n => n.id === note.id);
         const item = document.createElement('div');
-        item.className = "bg-slate-950 border border-slate-800 p-3.5 rounded-xl space-y-2";
+        item.className = "bg-slate-950 border border-slate-800 p-3 rounded-xl space-y-1.5";
 
         let badgeColor = "bg-cyan-500/20 text-cyan-300";
         if (note.category === 'Urgente') badgeColor = "bg-rose-500/20 text-rose-300";
@@ -261,19 +290,19 @@
 
         item.innerHTML = `
           <div class="flex items-center justify-between text-xs">
-            <span class="text-[9px] px-2.5 py-0.5 rounded-full font-mono font-bold ${badgeColor}">${note.category}</span>
+            <span class="text-[9px] px-2 py-0.5 rounded-full font-mono font-bold ${badgeColor}">${note.category}</span>
             <span class="text-[9px] text-slate-400 font-mono">${note.date}</span>
           </div>
           <h4 class="font-bold text-slate-100 text-xs">${note.title}</h4>
-          <p class="text-slate-300 text-[11px] whitespace-pre-wrap bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80">${note.content}</p>
+          <p class="text-slate-300 text-[11px] whitespace-pre-wrap bg-slate-900/60 p-2 rounded-lg border border-slate-800/80">${note.content}</p>
           <div class="flex flex-wrap items-center justify-end gap-1.5 pt-1">
-            <button onclick="shareWhatsApp(${realIndex})" class="px-2.5 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold text-[10px] flex items-center space-x-1 shadow">
+            <button onclick="shareWhatsAppHistory(${realIndex})" class="px-2 py-1 bg-green-600 hover:bg-green-500 text-white rounded-md font-bold text-[10px] flex items-center space-x-1 shadow">
               <span>💬 WhatsApp</span>
             </button>
-            <button onclick="editNote(${realIndex})" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-bold text-[10px] flex items-center space-x-1 shadow border border-slate-700">
+            <button onclick="editNote(${realIndex})" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-md font-bold text-[10px] flex items-center space-x-1 shadow border border-slate-700">
               <span>✏️ Editar</span>
             </button>
-            <button onclick="deleteNote(${realIndex})" class="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-bold text-[10px] shadow" title="Eliminar">
+            <button onclick="deleteNote(${realIndex})" class="px-2 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-md font-bold text-[10px] shadow" title="Eliminar">
               <span>🗑️</span>
             </button>
           </div>
@@ -282,16 +311,15 @@
       });
     }
 
-    function shareWhatsApp(index) {
+    function shareWhatsAppHistory(index) {
       const note = notes[index];
       if (!note) return;
-
-      const text = `*${note.title}* (${note.category})\n📅 ${note.date}\n\n${note.content}\n\n_Generado por VoxNote Pro - (c)cfaesoft_`;
+      const text = `*${note.title}* (${note.category})\n📅 ${note.date}\n\n${note.content}\n\n_Enviado desde VoxNote Pro - (c)cfaesoft_`;
       window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
     }
 
     function deleteNote(index) {
-      if (confirm("¿Estás seguro de eliminar esta nota?")) {
+      if (confirm("¿Estás seguro de eliminar esta nota del historial?")) {
         notes.splice(index, 1);
         syncLocalStorage();
         renderNotes();
