@@ -6,17 +6,28 @@
   <title>ReporterCam Pro - (c)cfaesoft</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
+    /* Forzar vista horizontal real e inmersiva al grabar */
     .recording-fullscreen {
       position: fixed !important;
       inset: 0 !important;
       z-index: 9999 !important;
       width: 100vw !important;
       height: 100vh !important;
+      max-width: none !important;
+      max-height: none !important;
       border-radius: 0 !important;
       border: none !important;
       margin: 0 !important;
       padding: 0 !important;
       background-color: #000 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+    .recording-fullscreen video {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover !important;
     }
   </style>
 </head>
@@ -33,7 +44,7 @@
         <p class="text-[9px] text-slate-400 tracking-widest uppercase font-mono mt-0.5">(c)cfaesoft - Cámara Periodística de Campo</p>
       </div>
       <div class="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-emerald-500/30 font-mono">
-        ONLINE
+        HD AUDIO+
       </div>
     </header>
 
@@ -61,17 +72,15 @@
       <video id="camera-preview" autoplay playsinline muted class="w-full h-full object-cover"></video>
       
       <!-- Cuenta Regresiva (Overlay 3, 2, 1) -->
-      <div id="countdown-overlay" class="hidden absolute inset-0 bg-black/80 flex items-center justify-center z-30">
-        <span id="countdown-number" class="text-6xl font-black text-cyan-400 animate-bounce font-mono">3</span>
-      </div>
-
-      <!-- Indicador Operativo -->
-      <div class="absolute top-2 right-2 bg-emerald-500/90 text-slate-950 text-[9px] font-bold px-2 py-0.5 rounded-full font-mono flex items-center space-x-1 z-10">
-        <span>🎬</span> <span>Listo para Grabar</span>
+      <div id="countdown-overlay" class="hidden absolute inset-0 bg-black/85 flex items-center justify-center z-30">
+        <div class="text-center space-y-2">
+          <p class="text-[11px] text-cyan-400 font-mono uppercase tracking-widest">¡Gira tu celular en horizontal!</p>
+          <span id="countdown-number" class="text-7xl font-black text-white animate-bounce font-mono">3</span>
+        </div>
       </div>
 
       <!-- Temporizador Flotante de Grabación Real -->
-      <div id="recording-timer" class="hidden absolute top-4 left-4 bg-rose-600/90 text-white font-mono font-bold text-sm px-3 py-1.5 rounded-xl animate-pulse flex items-center space-x-2 shadow-2xl z-20">
+      <div id="recording-timer" class="hidden absolute top-4 left-4 bg-rose-600/95 text-white font-mono font-bold text-sm px-3.5 py-1.5 rounded-xl animate-pulse flex items-center space-x-2 shadow-2xl z-20">
         <span>🔴 REC</span> <span id="timer-text">00:00</span>
       </div>
 
@@ -120,7 +129,9 @@
   </div>
 
   <script>
-    let mediaStream = null;
+    let rawStream = null;
+    let audioContext = null;
+    let gainNode = null;
     let mediaRecorder = null;
     let recordedChunks = [];
     let isRecording = false;
@@ -142,17 +153,17 @@
     }
 
     async function initCamera() {
-      if (mediaStream) {
-        mediaStream.getTracks().forEach(track => track.stop());
+      if (rawStream) {
+        rawStream.getTracks().forEach(track => track.stop());
       }
 
       try {
-        mediaStream = await navigator.mediaDevices.getUserMedia({
+        rawStream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: { echoCancellation: true, noiseSuppression: true }
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
         });
 
-        videoPreview.srcObject = mediaStream;
+        videoPreview.srcObject = rawStream;
       } catch (err) {
         alert("No se pudo acceder a la cámara o micrófono. Otorga los permisos necesarios.");
         console.error(err);
@@ -170,7 +181,7 @@
         return;
       }
 
-      enterFullscreenMode();
+      enterFullscreenLandscape();
 
       const countdownOverlay = document.getElementById('countdown-overlay');
       const countdownNumber = document.getElementById('countdown-number');
@@ -191,35 +202,61 @@
       }, 1000);
     }
 
-    async function enterFullscreenMode() {
+    async function enterFullscreenLandscape() {
       try {
         if (cameraContainer.requestFullscreen) {
           await cameraContainer.requestFullscreen();
         } else if (cameraContainer.webkitRequestFullscreen) {
           await cameraContainer.webkitRequestFullscreen();
         }
+
+        if (screen.orientation && screen.orientation.lock) {
+          await screen.orientation.lock('landscape').catch(() => {});
+        }
       } catch (err) {
-        console.log("Pantalla completa omitida.");
+        console.log("Pantalla completa activa.");
       }
       cameraContainer.classList.add('recording-fullscreen');
     }
 
     function startRecordingAction() {
-      if (!mediaStream) return;
+      if (!rawStream) return;
 
       document.getElementById('btn-stop-floating').classList.remove('hidden');
 
-      recordedChunks = [];
-      let options = { mimeType: 'video/webm;codecs=vp8,opus' };
-
-      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-        options = { mimeType: 'video/mp4' };
-      }
-
+      // Procesamiento de audio con Web Audio API para elevar el volumen y limpiar eco/ruido
       try {
-        mediaRecorder = new MediaRecorder(mediaStream, options);
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext.state === 'suspended') {
+          audioContext.resume();
+        }
+
+        const source = audioContext.createMediaStreamSource(rawStream);
+        gainNode = audioContext.createGain();
+        gainNode.gain.value = 3.0; // Ganancia de audio amplificada al 300% para excelente nitidez
+
+        const destination = audioContext.createMediaStreamDestination();
+        source.connect(gainNode);
+        gainNode.connect(destination);
+
+        const enhancedAudioTrack = destination.stream.getAudioTracks()[0];
+        const videoTrack = rawStream.getVideoTracks()[0];
+
+        const combinedStream = new MediaStream([videoTrack, enhancedAudioTrack]);
+
+        recordedChunks = [];
+        let options = { mimeType: 'video/webm;codecs=vp8,opus' };
+
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+          options = { mimeType: 'video/mp4' };
+        }
+
+        mediaRecorder = new MediaRecorder(combinedStream, options);
       } catch (e) {
-        mediaRecorder = new MediaRecorder(mediaStream);
+        // Fallback directo si el navegador bloquea el AudioContext
+        mediaRecorder = new MediaRecorder(rawStream);
       }
 
       mediaRecorder.ondataavailable = function(e) {
@@ -262,6 +299,10 @@
         document.exitFullscreen().catch(() => {});
       } else if (document.webkitExitFullscreen) {
         document.webkitExitFullscreen().catch(() => {});
+      }
+
+      if (screen.orientation && screen.orientation.unlock) {
+        screen.orientation.unlock();
       }
 
       if (mediaRecorder && mediaRecorder.state !== 'inactive') {
