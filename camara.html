@@ -448,3 +448,31 @@
 
       // INTENTO 2: Fallback automático si el navegador no permite compartir archivos directamente
       const textMsg = encodeURIComponent(`📹 Reporte de Prensa: *${v.name}*\n*(El video grabado fue descargado en tu dispositivo para adjuntarlo a este chat)*`);
+      const waUrl = `https://api.whatsapp.com/send?text=${textMsg}`;
+
+      // Descarga automática del archivo para facilitar adjuntarlo
+      const tempAnchor = document.createElement('a');
+      tempAnchor.href = v.url;
+      tempAnchor.download = `${v.name}.${ext}`;
+      document.body.appendChild(tempAnchor);
+      tempAnchor.click();
+      document.body.removeChild(tempAnchor);
+
+      // Abrir WhatsApp Web o App
+      window.open(waUrl, '_blank');
+      
+      alert("ℹ️ Tu video se guardó automáticamente en tus Descargas.\n\nWhatsApp se abrirá a continuación: presiona el icono de adjunto (📎) en el chat y selecciona el video recién descargado.");
+    }
+
+    function deleteVideo(index) {
+      videos.splice(index, 1);
+      renderVideos();
+    }
+
+    window.onload = () => {
+      initCamera();
+      updateOverlay();
+    };
+  </script>
+</body>
+</html>
