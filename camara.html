@@ -5,6 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ReporterCam Pro - (c)cfaesoft</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Estilos para el modo de grabación pantalla completa horizontal */
+    .recording-fullscreen {
+      position: fixed !important;
+      inset: 0 !important;
+      z-index: 9999 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      border-radius: 0 !important;
+      border: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      background-color: #000 !important;
+    }
+  </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen p-4 font-sans flex flex-col items-center justify-center">
 
@@ -43,23 +58,28 @@
     </div>
 
     <!-- Visor de Cámara con Cintillo y Temporizador -->
-    <div class="relative bg-black rounded-xl overflow-hidden aspect-video border border-slate-800 flex items-center justify-center">
+    <div id="camera-container" class="relative bg-black rounded-xl overflow-hidden aspect-video border border-slate-800 flex items-center justify-center transition-all duration-300">
       <video id="camera-preview" autoplay playsinline muted class="w-full h-full object-cover"></video>
       
       <!-- Aviso Orientación -->
       <div id="orientation-warning" class="absolute top-2 right-2 bg-amber-500/90 text-slate-950 text-[9px] font-bold px-2 py-0.5 rounded-full font-mono flex items-center space-x-1">
-        <span>🔄</span> <span>Usa la pantalla horizontal</span>
+        <span>🔄</span> <span>Modo Horizontal Activo al Grabar</span>
       </div>
 
       <!-- Temporizador -->
-      <div id="recording-timer" class="hidden absolute top-2 left-2 bg-rose-600 text-white font-mono font-bold text-xs px-2.5 py-1 rounded-lg animate-pulse flex items-center space-x-1">
+      <div id="recording-timer" class="hidden absolute top-4 left-4 bg-rose-600/90 text-white font-mono font-bold text-sm px-3 py-1.5 rounded-xl animate-pulse flex items-center space-x-2 shadow-lg z-20">
         <span>🔴</span> <span id="timer-text">00:00</span>
       </div>
 
+      <!-- Botón Flotante para Detener cuando está en pantalla completa -->
+      <button id="btn-stop-floating" onclick="stopRecording()" class="hidden absolute top-4 right-4 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-2xl z-20 flex items-center space-x-1 border border-white/20">
+        <span>⏹️</span> <span>Detener Grabación</span>
+      </button>
+
       <!-- Superposición de Titular / TV Lower Third -->
-      <div id="tv-overlay" class="absolute bottom-2 left-2 right-2 bg-slate-950/85 backdrop-blur-md border-l-4 border-cyan-400 p-2 text-left rounded-r-lg shadow-lg">
-        <p id="overlay-title" class="text-xs font-black text-slate-100 uppercase leading-tight truncate">COBERTURA EN VIVO</p>
-        <p class="text-[9px] text-cyan-400 font-mono mt-0.5 truncate">
+      <div id="tv-overlay" class="absolute bottom-3 left-3 right-3 bg-slate-950/85 backdrop-blur-md border-l-4 border-cyan-400 p-2.5 text-left rounded-r-lg shadow-2xl z-10">
+        <p id="overlay-title" class="text-xs sm:text-sm font-black text-slate-100 uppercase leading-tight truncate">COBERTURA EN VIVO</p>
+        <p class="text-[9px] sm:text-[10px] text-cyan-400 font-mono mt-0.5 truncate">
           <span id="overlay-reporter">Reportero de Calle</span> • <span id="overlay-location" class="text-slate-300">En el lugar de los hechos</span>
         </p>
       </div>
@@ -100,11 +120,12 @@
     let mediaRecorder = null;
     let recordedChunks = [];
     let isRecording = false;
-    let currentFacingMode = 'environment'; // Cámara trasera por defecto
+    let currentFacingMode = 'environment';
     let timerInterval = null;
     let videos = [];
 
     const videoPreview = document.getElementById('camera-preview');
+    const cameraContainer = document.getElementById('camera-container');
 
     function updateOverlay() {
       const title = document.getElementById('input-title').value.trim() || 'SIN TITULAR';
@@ -129,7 +150,7 @@
 
         videoPreview.srcObject = mediaStream;
       } catch (err) {
-        alert("No se pudo acceder a la cámara o micrófono. Asegúrate de dar los permisos correspondientes.");
+        alert("No se pudo acceder a la cámara o micrófono. Asegúrate de otorgar los permisos necesarios.");
         console.error(err);
       }
     }
@@ -139,16 +160,35 @@
       initCamera();
     }
 
-    function toggleVideoRecording() {
+    async function toggleVideoRecording() {
       if (!isRecording) {
-        startRecording();
+        await startRecording();
       } else {
         stopRecording();
       }
     }
 
-    function startRecording() {
+    async function startRecording() {
       if (!mediaStream) return;
+
+      // Solicitar Pantalla Completa y Bloqueo de Orientación Horizontal
+      try {
+        if (cameraContainer.requestFullscreen) {
+          await cameraContainer.requestFullscreen();
+        } else if (cameraContainer.webkitRequestFullscreen) {
+          await cameraContainer.webkitRequestFullscreen();
+        }
+
+        if (screen.orientation && screen.orientation.lock) {
+          await screen.orientation.lock('landscape').catch(() => {});
+        }
+      } catch (err) {
+        console.log("Pantalla completa activa sin bloqueo rígido.");
+      }
+
+      // Aplicar estilos de pantalla completa horizontal
+      cameraContainer.classList.add('recording-fullscreen');
+      document.getElementById('btn-stop-floating').classList.remove('hidden');
 
       recordedChunks = [];
       let options = { mimeType: 'video/webm;codecs=vp9,opus' };
@@ -192,6 +232,20 @@
       isRecording = false;
       clearInterval(timerInterval);
       document.getElementById('recording-timer').classList.add('hidden');
+      document.getElementById('btn-stop-floating').classList.add('hidden');
+
+      // Restaurar Pantalla Normal y Orientación
+      cameraContainer.classList.remove('recording-fullscreen');
+
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen().catch(() => {});
+      }
+
+      if (screen.orientation && screen.orientation.unlock) {
+        screen.orientation.unlock();
+      }
 
       if (mediaRecorder) {
         mediaRecorder.stop();
