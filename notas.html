@@ -23,15 +23,20 @@
       </div>
     </header>
 
-    <!-- Formulario de Creación de Nota -->
+    <!-- Formulario de Creación / Edición de Nota -->
     <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2 text-xs">
-      <h3 class="text-[10px] font-bold text-cyan-400 uppercase tracking-wider font-mono">✍️ Nueva Nota o Apunte</h3>
+      <div class="flex justify-between items-center">
+        <h3 id="form-title" class="text-[10px] font-bold text-cyan-400 uppercase tracking-wider font-mono">✍️ Nuevo Audiotexto / Nota</h3>
+        <button type="button" onclick="resetForm()" class="text-[10px] text-slate-400 hover:text-white font-mono underline">➕ Nuevo</button>
+      </div>
       
+      <input type="hidden" id="edit-index" value="-1">
+
       <div class="space-y-2">
         <input type="text" id="input-title" placeholder="Título de la nota..." class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none focus:border-cyan-500 font-bold text-xs">
         
         <div class="relative">
-          <textarea id="input-content" rows="3" placeholder="Escribe aquí o presiona el botón de micrófono para dictar..." class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none focus:border-cyan-500 text-xs resize-none"></textarea>
+          <textarea id="input-content" rows="3" placeholder="Escribe aquí, dicta por voz o edita el texto..." class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none focus:border-cyan-500 text-xs resize-none"></textarea>
         </div>
 
         <div class="flex items-center justify-between pt-1">
@@ -47,7 +52,7 @@
             <button type="button" id="btn-dictate" onclick="toggleDictation()" class="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs px-3 py-2 rounded-lg transition shadow flex items-center space-x-1" title="Dictar por voz">
               <span>🎙️</span> <span id="dictate-label">Dictar</span>
             </button>
-            <button type="button" onclick="saveNote()" class="bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition shadow">
+            <button type="button" onclick="saveNote()" id="btn-save" class="bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition shadow">
               💾 Guardar
             </button>
           </div>
@@ -84,7 +89,6 @@
     let recognition = null;
     let isListening = false;
 
-    // Inicializar API de Reconocimiento de Voz del Navegador
     function initSpeechRecognition() {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SpeechRecognition) {
@@ -109,13 +113,8 @@
           document.getElementById('input-content').value = transcript;
         };
 
-        recognition.onerror = () => {
-          stopDictation();
-        };
-
-        recognition.onend = () => {
-          stopDictation();
-        };
+        recognition.onerror = () => { stopDictation(); };
+        recognition.onend = () => { stopDictation(); };
       } else {
         document.getElementById('btn-dictate').style.display = 'none';
       }
@@ -126,7 +125,6 @@
         alert("Tu navegador no soporta el dictado por voz nativo.");
         return;
       }
-
       if (!isListening) {
         recognition.start();
       } else {
@@ -146,27 +144,59 @@
       const title = document.getElementById('input-title').value.trim();
       const content = document.getElementById('input-content').value.trim();
       const category = document.getElementById('input-category').value;
+      const editIndex = parseInt(document.getElementById('edit-index').value);
 
       if (!content) {
         alert("Escribe o dicta el contenido de la nota antes de guardar.");
         return;
       }
 
-      const newNote = {
-        id: Date.now(),
-        title: title || (content.substring(0, 25) + '...'),
-        content: content,
-        category: category,
-        date: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
+      const timestamp = new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-      notes.unshift(newNote);
+      if (editIndex > -1) {
+        // Actualizar nota existente
+        notes[editIndex].title = title || (content.substring(0, 25) + '...');
+        notes[editIndex].content = content;
+        notes[editIndex].category = category;
+        notes[editIndex].date = timestamp + " (Editado)";
+      } else {
+        // Crear nueva nota
+        const newNote = {
+          id: Date.now(),
+          title: title || (content.substring(0, 25) + '...'),
+          content: content,
+          category: category,
+          date: timestamp
+        };
+        notes.unshift(newNote);
+      }
+
       syncLocalStorage();
-      
-      // Limpiar campos
+      resetForm();
+      renderNotes();
+    }
+
+    function editNote(index) {
+      const note = notes[index];
+      if (!note) return;
+
+      document.getElementById('input-title').value = note.title;
+      document.getElementById('input-content').value = note.content;
+      document.getElementById('input-category').value = note.category;
+      document.getElementById('edit-index').value = index;
+
+      document.getElementById('form-title').textContent = "✏️ Editando Nota";
+      document.getElementById('btn-save').textContent = "💾 Actualizar";
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function resetForm() {
       document.getElementById('input-title').value = '';
       document.getElementById('input-content').value = '';
-      renderNotes();
+      document.getElementById('input-category').value = 'General';
+      document.getElementById('edit-index').value = -1;
+      document.getElementById('form-title').textContent = "✍️ Nuevo Audiotexto / Nota";
+      document.getElementById('btn-save').textContent = "💾 Guardar";
     }
 
     function syncLocalStorage() {
@@ -192,9 +222,7 @@
 
       list.innerHTML = '';
       filteredNotes.forEach((note) => {
-        // Encontrar índice real en el array principal
         const realIndex = notes.findIndex(n => n.id === note.id);
-        
         const item = document.createElement('div');
         item.className = "bg-slate-950 border border-slate-800 p-3 rounded-xl space-y-1.5";
 
@@ -213,6 +241,9 @@
           <div class="flex justify-end space-x-1.5 pt-1">
             <button onclick="shareWhatsApp(${realIndex})" class="px-2 py-1 bg-green-600 hover:bg-green-500 text-white rounded-md font-bold text-[10px] flex items-center space-x-1" title="Enviar por WhatsApp">
               <span>💬 WhatsApp</span>
+            </button>
+            <button onclick="editNote(${realIndex})" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-md font-bold text-[10px]" title="Editar">
+              <span>✏️ Editar</span>
             </button>
             <button onclick="deleteNote(${realIndex})" class="px-2 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-md font-bold text-[10px]" title="Eliminar">
               <span>🗑️</span>
