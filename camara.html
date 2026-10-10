@@ -6,7 +6,7 @@
   <title>ReporterCam Pro - (c)cfaesoft</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    /* Estilos para el modo de grabación pantalla completa horizontal */
+    /* Estilos inmersivos de pantalla completa durante la grabación */
     .recording-fullscreen {
       position: fixed !important;
       inset: 0 !important;
@@ -57,22 +57,22 @@
       </div>
     </div>
 
-    <!-- Visor de Cámara con Cintillo y Temporizador -->
+    <!-- Visor de Cámara en Vivo -->
     <div id="camera-container" class="relative bg-black rounded-xl overflow-hidden aspect-video border border-slate-800 flex items-center justify-center transition-all duration-300">
       <video id="camera-preview" autoplay playsinline muted class="w-full h-full object-cover"></video>
       
-      <!-- Aviso Orientación -->
-      <div id="orientation-warning" class="absolute top-2 right-2 bg-amber-500/90 text-slate-950 text-[9px] font-bold px-2 py-0.5 rounded-full font-mono flex items-center space-x-1">
-        <span>🔄</span> <span>Modo Horizontal Activo al Grabar</span>
+      <!-- Indicador de Requisito Horizontal -->
+      <div id="orientation-warning" class="absolute top-2 right-2 bg-amber-500/90 text-slate-950 text-[9px] font-bold px-2 py-0.5 rounded-full font-mono flex items-center space-x-1 z-10">
+        <span>🔄</span> <span id="orientation-text">Gira a Horizontal para Grabar</span>
       </div>
 
-      <!-- Temporizador -->
-      <div id="recording-timer" class="hidden absolute top-4 left-4 bg-rose-600/90 text-white font-mono font-bold text-sm px-3 py-1.5 rounded-xl animate-pulse flex items-center space-x-2 shadow-lg z-20">
-        <span>🔴</span> <span id="timer-text">00:00</span>
+      <!-- Temporizador Flotante de Grabación Real -->
+      <div id="recording-timer" class="hidden absolute top-4 left-4 bg-rose-600/90 text-white font-mono font-bold text-sm px-3 py-1.5 rounded-xl animate-pulse flex items-center space-x-2 shadow-2xl z-20">
+        <span>🔴 REC</span> <span id="timer-text">00:00</span>
       </div>
 
-      <!-- Botón Flotante para Detener cuando está en pantalla completa -->
-      <button id="btn-stop-floating" onclick="stopRecording()" class="hidden absolute top-4 right-4 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-2xl z-20 flex items-center space-x-1 border border-white/20">
+      <!-- Botón Flotante para Detener la Grabación en Pantalla Completa -->
+      <button id="btn-stop-floating" onclick="stopRecording()" class="hidden absolute top-4 right-4 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-2xl z-20 flex items-center space-x-1.5 border border-white/20">
         <span>⏹️</span> <span>Detener Grabación</span>
       </button>
 
@@ -127,6 +127,29 @@
     const videoPreview = document.getElementById('camera-preview');
     const cameraContainer = document.getElementById('camera-container');
 
+    function isLandscape() {
+      if (window.orientation !== undefined) {
+        return Math.abs(window.orientation) === 90;
+      }
+      return window.innerWidth > window.innerHeight;
+    }
+
+    function checkOrientationStatus() {
+      const warningText = document.getElementById('orientation-text');
+      const warningBadge = document.getElementById('orientation-warning');
+
+      if (isLandscape()) {
+        warningText.textContent = "Modo Horizontal OK ✅";
+        warningBadge.className = "absolute top-2 right-2 bg-emerald-500/90 text-slate-950 text-[9px] font-bold px-2 py-0.5 rounded-full font-mono flex items-center space-x-1 z-10";
+      } else {
+        warningText.textContent = "Gira a Horizontal para Grabar 🔄";
+        warningBadge.className = "absolute top-2 right-2 bg-amber-500/90 text-slate-950 text-[9px] font-bold px-2 py-0.5 rounded-full font-mono flex items-center space-x-1 z-10";
+      }
+    }
+
+    window.addEventListener('resize', checkOrientationStatus);
+    window.addEventListener('orientationchange', checkOrientationStatus);
+
     function updateOverlay() {
       const title = document.getElementById('input-title').value.trim() || 'SIN TITULAR';
       const reporter = document.getElementById('input-reporter').value.trim() || 'Prensa';
@@ -149,8 +172,9 @@
         });
 
         videoPreview.srcObject = mediaStream;
+        checkOrientationStatus();
       } catch (err) {
-        alert("No se pudo acceder a la cámara o micrófono. Asegúrate de otorgar los permisos necesarios.");
+        alert("No se pudo acceder a la cámara o micrófono. Otorga los permisos en el navegador.");
         console.error(err);
       }
     }
@@ -171,7 +195,13 @@
     async function startRecording() {
       if (!mediaStream) return;
 
-      // Solicitar Pantalla Completa y Bloqueo de Orientación Horizontal
+      // Validación estricta de orientación horizontal
+      if (!isLandscape()) {
+        alert("⚠️ ATENCIÓN: Debes colocar tu celular en posición HORIZONTAL (echado) antes de iniciar la grabación.");
+        return;
+      }
+
+      // Activar pantalla completa real para ver la toma en directo
       try {
         if (cameraContainer.requestFullscreen) {
           await cameraContainer.requestFullscreen();
@@ -183,10 +213,9 @@
           await screen.orientation.lock('landscape').catch(() => {});
         }
       } catch (err) {
-        console.log("Pantalla completa activa sin bloqueo rígido.");
+        console.log("Pantalla completa activa.");
       }
 
-      // Aplicar estilos de pantalla completa horizontal
       cameraContainer.classList.add('recording-fullscreen');
       document.getElementById('btn-stop-floating').classList.remove('hidden');
 
@@ -229,12 +258,14 @@
     }
 
     function stopRecording() {
+      if (!isRecording) return;
+
       isRecording = false;
       clearInterval(timerInterval);
       document.getElementById('recording-timer').classList.add('hidden');
       document.getElementById('btn-stop-floating').classList.add('hidden');
 
-      // Restaurar Pantalla Normal y Orientación
+      // Salir de pantalla completa y restaurar la interfaz
       cameraContainer.classList.remove('recording-fullscreen');
 
       if (document.exitFullscreen) {
@@ -247,7 +278,7 @@
         screen.orientation.unlock();
       }
 
-      if (mediaRecorder) {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         mediaRecorder.stop();
       }
 
